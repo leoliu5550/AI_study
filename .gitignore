@@ -3,3 +3,4 @@ env*
 mnist*
 DATA/*
 *.ipynb_checkpoints
+temp*
