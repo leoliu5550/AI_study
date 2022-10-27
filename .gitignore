@@ -4,3 +4,4 @@ mnist*
 DATA/*
 *.ipynb_checkpoints
 temp*
+*workspace
