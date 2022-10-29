@@ -2,6 +2,8 @@ from torch.utils.data import DataLoader,Dataset
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+import time
 import os
 import pickle
 import matplotlib.pyplot as plt
@@ -50,13 +52,14 @@ class CDataset(Dataset):
         
         data = self.unpickle(path)
         img = np.transpose(np.reshape(data[b'data'][idx],(3, 32,32)), (1,2,0))
-        
+        print(img.shape)
         # data prepare
         img_tensor = torch.from_numpy(img)
+        print(img_tensor.shape)
         label = data[b'labels'][idx]
         label_name = data[b'filenames'][idx]
         
-        return (label,label_name,img_tensor)
+        return label,label_name,img_tensor
     
     def __len__(self):
     # 需要返回資料的長度，取資料的時候才知道要找哪個
@@ -73,8 +76,6 @@ class CDataset(Dataset):
             dict = pickle.load(fo, encoding='bytes')
         return dict
     
-
-
     @staticmethod
     def show_image(tensor,name):
         plt.title(name)
@@ -104,14 +105,88 @@ dataloader = DataLoader(
     batch_size=1, 
     shuffle=False)
 
-class CNN(nn.Module):
+class cnn(nn.Module):
     def __init__(self):
         super().__init__()
-        self.cnn1 = nn.Conv2d(in_channels=3,)
+        self.cnn1 = nn.Conv2d(
+            in_channels=3,
+            out_channels=3,
+            kernel_size=3,
+            stride=1,
+            padding=1
+            )
+        self.sig = nn.Sigmoid()
+        self.maxpool1 = nn.MaxPool2d(
+            kernel_size=2
+            )
+        self.cnn2 = nn.Conv2d(
+            in_channels=3,
+            out_channels=1,
+            kernel_size=3,
+            stride=1,
+            padding=1
+        )
+        self.sig2 = nn.Sigmoid()
+        self.maxpool2 = nn.MaxPool2d(
+            kernel_size=2
+            ) 
+        self.fc = nn.Linear(7*7*1,10)
+        self.fc2 = nn.Linear(10,10)
+    
+    def forward(self, x):
+        
+        out = self.cnn1(x)
+        out = self.sig(out)
+        out = self.maxpool1(out)
+        out = self.cnn2(out)
+        out = self.sig2(out)
+        out = self.maxpool2(out)
+
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        out = self.fc2(out)
+        return out
+# Traning the Model
+#history-like list for store loss & acc value
+training_loss = []
+training_accuracy = []
+validation_loss = []
+validation_accuracy = []
+
+CNN = cnn()
+print(CNN)
 
 
-# for i in dataloader:
 
-#     print(i)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(CNN.parameters(), lr=0.1)
 
-#     break
+EPOCH = 1
+
+for epoch in range(EPOCH):  # loop over the dataset multiple times
+
+    running_loss = 0.0
+    for i, data in enumerate(dataloader, 0):
+        # get the inputs; data is a list of [inputs, labels]
+        labels,names ,inputs  = data
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward + backward + optimize
+        outputs = CNN(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        # # print statistics
+        # running_loss += loss.item()
+        # if i % 2000 == 1999:    # print every 2000 mini-batches
+        #     print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+        #     running_loss = 0.0
+        break
+
+print('Finished Training')
+
+PATH = './model/cifar_net.pth'
+torch.save(CNN.state_dict(), PATH)
